@@ -23,6 +23,8 @@ var particles = require('./3d/particles');
 var lights = require('./3d/lights');
 var floor = require('./3d/floor');
 
+var audio_init = require('./audio/audio');
+var music_init = require('./audio/music');
 
 var undef;
 var _gui;
@@ -46,8 +48,13 @@ var _logo;
 var _instruction;
 var _footerItems;
 
-function init() {
+var music;
 
+function init() {
+    
+    var audio = audio_init(234145361);
+    music = music_init(audio);
+  
     if(settings.useStats) {
         _stats = new Stats();
         css(_stats.domElement, {
@@ -120,14 +127,14 @@ function init() {
     });
     simulatorGui.add(settings, 'speed', 0, 3).listen();
     simulatorGui.add(settings, 'dieSpeed', 0.0005, 0.05).listen();
-    simulatorGui.add(settings, 'radius', 0.2, 3);
+    simulatorGui.add(settings, 'radius', 0.2, 3).listen();
     simulatorGui.add(settings, 'curlSize', 0.001, 0.05).listen();
-    simulatorGui.add(settings, 'attraction', -2, 2);
+    simulatorGui.add(settings, 'attraction', -2, 2).listen();
     simulatorGui.add(settings, 'followMouse').name('follow mouse');
     simulatorGui.open();
 
     var renderingGui = _gui.addFolder('Rendering');
-    renderingGui.add(settings, 'shadowDarkness', 0, 1).name('shadow');
+    renderingGui.add(settings, 'shadowDarkness', 0, 1).name('shadow').listen();
     renderingGui.add(settings, 'useTriangleParticles').name('new particle');
     renderingGui.addColor(settings, 'color1').name('base Color');
     renderingGui.addColor(settings, 'color2').name('fade Color');
@@ -284,8 +291,31 @@ function _render(dt, newTime) {
     bloom.enabled = !!settings.bloom;
 
     // _renderer.render(_scene, _camera);
+  
+    reactive();
     postprocessing.render(dt, newTime);
 
+}
+
+function reactive () {
+  var m = music();
+  var s = settings;
+  
+  function mix (a,b,v) {
+    v = v > 1 ? 1: v < 0 ? 0 : v;
+    return b * v + (1-v) * a;
+  }
+  
+  s.speed = 1.66 * Math.min(m.low[0], m.mid[0]);
+  s.curlSize = Math.min(0.05, mix(0.005,0.02,m.mid[1]));
+  s.radius = mix(0.2,1.4,Math.min(m.mid[2], m.low[2]));
+  s.shadowDarkness = Math.max(0.33, Math.min(1.0, m.high[3] + m.mid[2] - m.ultra[2]));
+  bloom.amount = 0.2 + m.ultra[3];
+  bloom.blurRadius = 1.1 + m.ultra[0];
+  s.attraction = mix(m.high[2] + 2 * m.low[2] , - m.low[0], m.mid[3]);
+  s.dieSpeed = mix(0.01, 0.02, m.mid[3]);
+  //console.log(settings);
+  //console.log(data);
 }
 
 mobile.pass(init);
